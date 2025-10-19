@@ -1,0 +1,12 @@
+#decls
+
+[cat]
+name = "dumb cat"
+
+#enddecls
+
+#script
+
+cat "hi"
+
+#endscript
