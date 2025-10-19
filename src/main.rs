@@ -3,11 +3,13 @@ use std::{collections::HashMap, fs};
 #[derive(Debug)]
 struct Actor {
     name: String,
+    sprites: HashMap<String, String>,
 }
 impl Default for Actor {
     fn default() -> Self {
         Self {
             name: String::new(),
+            sprites: HashMap::new(),
         }
     }
 }
@@ -15,6 +17,9 @@ impl Default for Actor {
 fn parse_decls(lines: &Vec<&str>) -> Result<HashMap<String, Actor>, String> {
     let mut actor_pool = HashMap::new();
     let mut current_actor_id: &str = "";
+    let mut is_parsing_spritemap = false;
+    let mut spritemap_string = String::new();
+
     for line in lines {
         if let Some('[') = line.chars().nth(0) {
             if !line.ends_with("]") {
@@ -30,30 +35,55 @@ fn parse_decls(lines: &Vec<&str>) -> Result<HashMap<String, Actor>, String> {
             current_actor_id = actor_id;
             actor_pool.insert(actor_id.to_owned(), Actor::default());
         } else {
-            let equal_sign_idx = line.find("=").ok_or("Cannot find equal sign")?;
-            let property_name = line[0..equal_sign_idx].trim();
-            if property_name.contains(" ") {
-                return Err(
+            if !is_parsing_spritemap {
+                let equal_sign_idx = line.find("=").ok_or("Cannot find equal sign")?;
+                let property_name = line[0..equal_sign_idx].trim();
+                if property_name.contains(" ") {
+                    return Err(
                     "Whitespace detected in actor's property name. Double check your script file."
                         .into(),
                 );
-            }
-            dbg!(property_name);
-            let property_value_string = line[equal_sign_idx + 1..line.len()].trim();
-            println!(
-                "{}",
-                property_value_string[1..property_value_string.len() - 1].to_owned()
-            );
-            if let Some(actor) = actor_pool.get_mut(current_actor_id) {
-                match property_name {
-                    "name" => {
-                        actor.name =
-                            property_value_string[1..property_value_string.len() - 1].into()
+                }
+
+                if let Some(actor) = actor_pool.get_mut(current_actor_id) {
+                    match property_name {
+                        "name" => actor.name = line[equal_sign_idx + 1..line.len()].trim().into(),
+                        "sprites" => {
+                            spritemap_string.push_str(&line[equal_sign_idx + 1..line.len()]);
+                            is_parsing_spritemap = true;
+                        }
+                        _ => {
+                            return Err(format!(
+                                "what kind of actor property is ts 💔: {property_name}"
+                            ));
+                        }
                     }
-                    _ => {
-                        return Err(format!(
-                            "what kind of actor property is ts 💔: {property_name}"
-                        ));
+                }
+            } else {
+                spritemap_string.push_str(&line);
+                // the spritemap ended
+                if line.trim() == "}" {
+                    let trimmed_spritemap_string: String = spritemap_string
+                        .trim()
+                        .chars()
+                        .filter(|ch| *ch != ' ' && *ch != '{' && *ch != '}')
+                        .collect();
+                    let key_values: Vec<&str> = trimmed_spritemap_string.split(",").collect();
+                    assert!(key_values[0].starts_with("init:"));
+                    for kv_pair_string in key_values {
+                        let colon_idx = kv_pair_string
+                            .find(':')
+                            .expect("Could not find comma ':' while parsing map");
+                        let (key, value_with_comma) = kv_pair_string.split_at(colon_idx);
+                        let value = &value_with_comma[1..];
+                        dbg!(key);
+                        dbg!(value);
+
+                        if let Some(actor) = actor_pool.get_mut(current_actor_id) {
+                            actor
+                                .sprites
+                                .insert(key.into(), (value[1..value.len() - 1]).to_owned());
+                        }
                     }
                 }
             }
@@ -93,8 +123,8 @@ fn main() {
         }
     }
 
-    dbg!(&decl_lines);
-    dbg!(&script_lines);
+    // dbg!(&decl_lines);
+    // dbg!(&script_lines);
 
     let actor_pool = parse_decls(&decl_lines).unwrap();
     dbg!(actor_pool);

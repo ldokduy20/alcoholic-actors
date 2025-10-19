@@ -1,7 +1,11 @@
 #decls
 
 [cat]
-name = "dumb cat"
+name = "dumb cat";
+sprites = {
+    init : "normal.png",
+    angry : "angry.png"
+}
 
 #enddecls
 
